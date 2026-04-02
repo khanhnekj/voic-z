@@ -1,92 +1,45 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
-import gTTS from "google-tts-api";
+import axios from "axios";
 
 const app = express();
-
 app.use(cors());
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json());
 
-// ===============================
-// 🔥 split text unlimited
-// ===============================
-function splitText(text, max = 200) {
-  const chunks = [];
-  let current = "";
-
-  const words = text.split(" ");
-
-  for (let w of words) {
-    if ((current + " " + w).length > max) {
-      chunks.push(current);
-      current = w;
-    } else {
-      current += (current ? " " : "") + w;
-    }
-  }
-
-  if (current) chunks.push(current);
-
-  return chunks;
-}
-
-// ===============================
-// 🚀 ROOT CHECK
-// ===============================
-app.get("/", (req, res) => {
-  res.json({
-    status: "ok",
-    message: "TTS API FULL RUNNING"
-  });
-});
-
-// ===============================
-// 🔥 MAIN TTS API (UNLIMITED)
-// ===============================
+// ======================
+// TTS FREE (Google Translate unofficial)
+// ======================
 app.post("/tts", async (req, res) => {
-  try {
-    const { text, lang = "vi" } = req.body;
+    try {
+        const { text } = req.body;
+        if (!text) return res.status(400).send("missing text");
 
-    if (!text) {
-      return res.status(400).json({ error: "missing text" });
+        // Google Translate TTS free endpoint
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=vi&client=tw-ob`;
+
+        const audio = await axios({
+            method: "GET",
+            url,
+            responseType: "arraybuffer",
+            headers: {
+                "User-Agent": "Mozilla/5.0"
+            }
+        });
+
+        res.set({
+            "Content-Type": "audio/mpeg"
+        });
+
+        res.send(audio.data);
+
+    } catch (e) {
+        console.log(e);
+        res.status(500).send("error");
     }
-
-    const chunks = splitText(text, 200);
-
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Cache-Control", "no-cache");
-
-    for (const chunk of chunks) {
-      const url = gTTS.getAudioUrl(chunk, {
-        lang,
-        slow: false,
-        host: "https://translate.google.com",
-      });
-
-      const audio = await fetch(url);
-
-      if (!audio.ok) continue;
-
-      await new Promise((resolve, reject) => {
-        audio.body.pipe(res, { end: false });
-        audio.body.on("end", resolve);
-        audio.body.on("error", reject);
-      });
-    }
-
-    res.end();
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "server error" });
-  }
 });
 
-// ===============================
-// 🚀 START SERVER
-// ===============================
-const PORT = process.env.PORT || 3000;
+// ======================
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
-  console.log("🔥 FULL TTS API running on port " + PORT);
+    console.log("🔥 VOICE FREE RUNNING ON", PORT);
 });
